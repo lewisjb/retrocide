@@ -9,6 +9,21 @@ class Society:
     def next_iteration(self):
         pass
 
+class Emotion:
+    def __init__(self):
+        self.joy = 0
+        self.trust = 0
+        self.fear = 0
+        self.surprise = 0
+        self.sadness = 0
+        self.disgust = 0
+        self.anger = 0
+        self.anticipation = 0
+
+    def get_abs_emotion(self):
+        return (self.joy + self.trust + self.surprise + self.anticipation
+                 - self.fear - self.sadness - self.disgust - self.anger)
+
 class AgentConnection:
     """
         Connection between two agents.
@@ -25,24 +40,16 @@ class AgentConnection:
         self.agent = agent
         self.stage = 0
 
-        # The 8 basic emotions
-        self.joy = 0
-        self.trust = 0
-        self.fear = 0
-        self.surprise = 0
-        self.sadness = 0
-        self.disgust = 0
-        self.anger = 0
-        self.anticipation = 0
+        self.emotions = Emotion()
 
     def get_connection_factor(self):
-        return (0.5 + self.joy + self.trust + self.surprise + self.anticipation
-                 - self.fear - self.sadness - self.disgust - self.anger)
+        return 0.5 + self.emotions.get_abs_emotion()
 
 class Agent:
     def __init__(self, dna):
         self.connections = [] # Connections with other agents
         self.age = 0 # Age in iterations (days)
+        self.emotions = Emotion()
 
         self.dna = dna
         self.unpack_dna()
