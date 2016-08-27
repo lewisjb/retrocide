@@ -24,7 +24,7 @@ class AgentConnection:
     def __init__(self, agent):
         self.agent = agent
         self.stage = 0
-        
+
         # The 8 basic emotions
         self.joy = 0
         self.trust = 0
@@ -34,6 +34,10 @@ class AgentConnection:
         self.disgust = 0
         self.anger = 0
         self.anticipation = 0
+
+    def get_connection_factor(self):
+        return (0.5 + self.joy + self.trust + self.surprise + self.anticipation
+                 - self.fear - self.sadness - self.disgust - self.anger)
 
 class Agent:
     def __init__(self, dna):
@@ -81,6 +85,25 @@ class Agent:
 
         return offspring
 
+    def get_relationship_factor(self, agent, visited=None):
+        if visited == None:
+            visited = {}
+
+        if self == agent:
+            return 1.0
+
+        factor = 0.0
+        for c in self.connections:
+            if visited.get(c.agent, False):
+                continue
+            tmp = visited.copy()
+            tmp[self] = True
+            factor += (c.get_connection_factor() *
+                            c.agent.get_relationship_factor(agent, tmp))
+
+        return factor
+
+
 def generate_random_agent(seed):
     sex = random.random() < 0.5
     personality = [random.random() < 0.5 for _ in xrange(4)]
@@ -97,6 +120,7 @@ def generate_random_agent(seed):
 
 def generate_random_society(seed=None):
     if seed == None: seed == os.urandom()
+    random.seed(seed)
     num_agents = random.randrange(10, 21)
 
     agents = []
