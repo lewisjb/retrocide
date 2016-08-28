@@ -26,6 +26,9 @@ class Society:
         self.iteration = 0
 
     def __str__(self):
+        if len(self.agents) == 0:
+            return "They're all dead. Everybody's dead Dave."
+
         ret = ""
         mlen = max((len(a.name) for a in self.agents))
 
@@ -63,8 +66,12 @@ class Society:
     def next_iteration(self):
         self.iteration += 1
         random.seed(self.iteration + len(self.agents))
+        dead = []
         for agent in self.agents:
             agent.age += 1
+            if agent.dead:
+                dead.append(agent)
+                continue
 
             if agent.pregnant > 0:
                 agent.pregnant += 1
@@ -77,6 +84,11 @@ class Society:
                     agent.partner.partner = None
                     agent.pregnant = 0
                     agent.partner = None
+
+            # Old age
+            if agent.age > random.randrange(30 * 365, 80 * 365):
+                print "%s died of old age" % agent.name
+                agent.die()
 
             for i, a in enumerate(self.agents):
                 #rf = agent.get_relationship_factor(a)
@@ -101,11 +113,15 @@ class Society:
             # Handle emotions
             if agent.emotions.sadness > 10:
                 # Depression =/= sadness, but this is easier to code
+                print "%s killed themselves." % agent.name
                 agent.kill(agent) # Suicide
 
-            # Old age
-            if agent.age > random.randrange(50 * 365, 100 * 365):
-                agent.die()
+            # General loss of emotions
+            if random.random() < 0.01:
+                agent.emotions.decrease_all()
+
+        for d in dead:
+            del self.agents[self.agents.index(d)]
 
 
     @classmethod
@@ -213,6 +229,9 @@ class Agent:
         self.dna = dna
         self.unpack_dna()
 
+
+        self.dead = False
+
     def unpack_dna(self):
         sex = ord(self.dna[0])
         personality = ord(self.dna[1])
@@ -232,24 +251,35 @@ class Agent:
     #XXX Make it get half of the parents personalities
     def create_offspring(self, partner):
         random.seed(self.age + partner.age)
-        first = None
-        second = None
+
+        male = False
+        personality = []
         if random.random() < 0.5:
             # Gets the first half of this agent and second of partner
             # XXX Don't hardcode
-            first = self.dna[0]
-            second = partner.dna[1]
+            male = self.sex
+            personality = [self.personality[0], self.personality[1],
+                            partner.personality[2], partner.personality[3]]
         else:
-            first = partner.dna[0]
-            second = partner.dna[1]
+            male = self.sex
+            personality = [partner.personality[0], partner.personality[1],
+                            self.personality[2], self.personality[3]]
 
-        offspring_dna = "%c%c" % (first, second) # XXX Need new way for more dna
-        offspring_name = random_names[bool(first)][random.randrange(50)]
+        personality_int = 0
+        for i in xrange(4):
+            if personality[i]:
+                personality_int |= (1 << i)
+
+        offspring_dna = "%c%c" % (male, personality_int)
+
+        offspring_name = random_names[male][random.randrange(50)]
         offspring = Agent(offspring_dna, offspring_name)
 
         # Make connections with parents
         offspring.add_connection(self)
         offspring.add_connection(partner)
+
+        print "%s was born" % offspring.name
 
         return offspring
 
@@ -283,7 +313,7 @@ class Agent:
         co_c = agent.get_connection(self)
 
         age_diff = agent.age - self.age
-        diff_sex = self.sex == agent.sex
+        diff_sex = self.sex != agent.sex
 
         s_emotions = self.emotions.get_abs_emotion()
         a_emotions = agent.emotions.get_abs_emotion()
@@ -295,9 +325,9 @@ class Agent:
         # Handle encounter
 
         # Murder (they can both die)
-        if self.emotions.anger > 10:
+        if self.emotions.anger > 20 and self.emotions.fear == 0:
             self.kill(agent)
-        if agent.emotions.anger > 10:
+        if agent.emotions.anger > 20 and self.emotions.fear == 0:
             agent.kill(self)
 
         # Procreating
@@ -307,46 +337,75 @@ class Agent:
                     if pc > 2:
                         pf = (self.emotions.joy + self.emotions.trust +
                             agent.emotions.joy + agent.emotions.trust)
-                        if pf > 30:
+                        pf += (c.emotions.joy + c.emotions.trust +
+                            co_c.emotions.joy + co_c.emotions.trust)
+                        if pf > 25:
                             # Should probs do more checking of stuff
                             self.pregnant = 1
                             self.partner = agent
 
                             agent.pregnant = 1
                             agent.partner = self
+                            
+                            # Regret
+                            #self.emotions.joy /= 2
+                            #self.emotions.trust /= 2
+
+                            #agent.emotions.joy /= 2
+                            #agent.emotions.trust /= 2
                         
 
 
         # Increase positive emotions
-        c.emotions.joy += 1
-        c.emotions.trust += 1
-        co_c.emotions.joy += 1
-        co_c.emotions.trust += 1
+        if pc > 2:
+            if random.random() < 0.1:
+                c.emotions.joy += 1
+                c.emotions.trust += 1
+                co_c.emotions.joy += 1
+                co_c.emotions.trust += 1
 
-        self.emotions.joy += 1
-        self.emotions.trust += 1
+                self.emotions.joy += 1
+                self.emotions.trust += 1
 
-        agent.emotions.joy += 1
-        agent.emotions.trust += 1
+                agent.emotions.joy += 1
+                agent.emotions.trust += 1
+
+        if pc < 1:
+            if random.random() < 0.01:
+                c.emotions.anger += 1
+                c.emotions.disgust += 1
+                co_c.emotions.anger += 1
+                co_c.emotions.disgust += 1
+
+                self.emotions.anger += 1
+                self.emotions.disgust += 1
+
+                agent.emotions.anger += 1
+                agent.emotions.disgust += 1
 
     def kill(self, agent):
         # Kill the person
 
         # Emotions
-        self.anger /= 2
-        self.fear += 10
+        self.emotions.anger = 0
+        self.emotions.fear += 30
 
+        print "%s killed %s." % (self.name, agent.name)
         agent.die()
 
     def die(self):
+        if self.dead: return
+        print "%s Died." % self.name
         # Effect connections, then remove them
         for c in self.connections:
             c.agent.emotions.sadness += 1
             
             rm = c.agent.get_connection(self)
             del c.agent.connections[c.agent.connections.index(rm)]
+            
+        self.dead = True
 
-        self.connections = None
+        self.connections = []
 
     def sever(self, connection):
         # Sever connection
@@ -392,9 +451,25 @@ DNA Spec:
 """
 
 if __name__ == '__main__':
-    x = Society.generate_random(15)
+    x = Society.generate_random(26)
     print x
-    for _ in xrange(365 * 100):
+    while True:
+        inp = raw_input("Select who to kill: ")
+        if inp == "":
+            break
+        try:
+            n = int(inp)
+        except ValueError:
+            print "Invalid number"
+            continue
+        if n >= 0 and n < len(x.agents):
+            x.agents[n].die()
+        else:
+            print "Invalid number"
+
+    for i in xrange(365 * 10):
         x.next_iteration()
+        #if i % 50 == 0:
+        #    print len(x.agents)
 
     print x
