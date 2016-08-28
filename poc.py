@@ -64,12 +64,49 @@ class Society:
         self.iteration += 1
         random.seed(self.iteration + len(self.agents))
         for agent in self.agents:
+            agent.age += 1
+
+            if agent.pregnant > 0:
+                agent.pregnant += 1
+                if agent.pregnant > 9 * 30:
+                    # Create baby
+                    self.agents.append(agent.create_offspring(agent.partner))
+
+                    # Reset pregnancy
+                    agent.partner.pregnant = 0
+                    agent.partner.partner = None
+                    agent.pregnant = 0
+                    agent.partner = None
+
             for i, a in enumerate(self.agents):
-                rf = agent.get_relationship_factor(a)
+                #rf = agent.get_relationship_factor(a)
+                # XXX Fix RF Speed
+                rf = 0.1
                 if random.random() - 0.1 < rf:
                     # They met (or met again)
-                    agent.encounter(a, rf, self.iteration)
-        #XXX Check age of connections
+                    agent.encounter(a, rf, self)
+
+            last_encounter = 0
+            for c in agent.connections:
+                if c.last_encounter > last_encounter:
+                    last_encounter = c.last_encounter
+
+                inactivity = self.iteration - c.last_encounter
+                if inactivity > 100:
+                    c.emotions.decrease_all()
+
+                if not c.emotions.any_emotion():
+                    agent.sever(c)
+
+            # Handle emotions
+            if agent.emotions.sadness > 10:
+                # Depression =/= sadness, but this is easier to code
+                agent.kill(agent) # Suicide
+
+            # Old age
+            if agent.age > random.randrange(50 * 365, 100 * 365):
+                agent.die()
+
 
     @classmethod
     def generate_random(cls, seed=None):
@@ -117,6 +154,30 @@ class Emotion:
         return (self.joy + self.trust + self.surprise + self.anticipation
                  - self.fear - self.sadness - self.disgust - self.anger)
 
+    def decrease_all(self):
+        if self.joy > 0:
+            self.joy -= 1
+        if self.trust > 0:
+            self.trust -= 1
+        if self.fear > 0:
+            self.fear -= 1
+        if self.surprise > 0:
+            self.surprise -= 1
+        if self.sadness > 0:
+            self.sadness -= 1
+        if self.disgust > 0:
+            self.disgust -= 1
+        if self.anger > 0:
+            self.anger -= 1
+        if self.anticipation > 0:
+            self.anticipation -= 1
+
+    def any_emotion(self):
+        if (self.joy or self.trust or self.fear or self.surprise or
+            self.sadness or self.disgust or self.anger or self.anticipation):
+                return True
+        return False
+
 class AgentConnection:
     """
         Connection between two agents.
@@ -146,6 +207,8 @@ class Agent:
         self.age = 0 # Age in iterations (days)
         self.emotions = Emotion()
         self.name = name
+
+        self.pregnant = 0 # How many days pregnant
 
         self.dna = dna
         self.unpack_dna()
@@ -181,7 +244,7 @@ class Agent:
             second = partner.dna[1]
 
         offspring_dna = "%c%c" % (first, second) # XXX Need new way for more dna
-        offspring_name = random_names[sex][random.randrange(50)]
+        offspring_name = random_names[bool(first)][random.randrange(50)]
         offspring = Agent(offspring_dna, offspring_name)
 
         # Make connections with parents
@@ -208,12 +271,17 @@ class Agent:
 
         return factor
 
-    def encounter(self, agent, rf, iteration):
+    def encounter(self, agent, rf, society):
         # Take into account: Sex, Personality, relationship factor,
         # current emotions, age
         c = self.get_connection(agent)
         if c:
-            c.last_encounter = iteration
+            c.last_encounter = society.iteration
+        else:
+            self.add_connection(agent)
+            c = self.get_connection(agent)
+        co_c = agent.get_connection(self)
+
         age_diff = agent.age - self.age
         diff_sex = self.sex == agent.sex
 
@@ -225,6 +293,74 @@ class Agent:
                     for i in xrange(4)])
 
         # Handle encounter
+
+        # Murder (they can both die)
+        if self.emotions.anger > 10:
+            self.kill(agent)
+        if agent.emotions.anger > 10:
+            agent.kill(self)
+
+        # Procreating
+        if diff_sex:
+            if self.age > 16 * 365 and agent.age > 16 * 365:
+                if self.can_procreate() and agent.can_procreate():
+                    if pc > 2:
+                        pf = (self.emotions.joy + self.emotions.trust +
+                            agent.emotions.joy + agent.emotions.trust)
+                        if pf > 30:
+                            # Should probs do more checking of stuff
+                            self.pregnant = 1
+                            self.partner = agent
+
+                            agent.pregnant = 1
+                            agent.partner = self
+                        
+
+
+        # Increase positive emotions
+        c.emotions.joy += 1
+        c.emotions.trust += 1
+        co_c.emotions.joy += 1
+        co_c.emotions.trust += 1
+
+        self.emotions.joy += 1
+        self.emotions.trust += 1
+
+        agent.emotions.joy += 1
+        agent.emotions.trust += 1
+
+    def kill(self, agent):
+        # Kill the person
+
+        # Emotions
+        self.anger /= 2
+        self.fear += 10
+
+        agent.die()
+
+    def die(self):
+        # Effect connections, then remove them
+        for c in self.connections:
+            c.agent.emotions.sadness += 1
+            
+            rm = c.agent.get_connection(self)
+            del c.agent.connections[c.agent.connections.index(rm)]
+
+        self.connections = None
+
+    def sever(self, connection):
+        # Sever connection
+        agent = connection.agent
+        index = self.connections.index(connection)
+        del self.connections[index]
+
+        c = agent.get_connection(self)
+        index2 = agent.connections.index(c)
+        del agent.connections[index2]
+
+    def can_procreate(self):
+        return self.pregnant == 0
+
 
     @classmethod
     def generate_random(cls, seed):
@@ -239,7 +375,7 @@ class Agent:
         name = random_names[sex][random.randrange(50)]
         agent = Agent(dna, name)
 
-        agent.age = random.randrange(0, 1000)
+        agent.age = random.randrange(0, 20 * 365)
 
         return agent
 
@@ -248,13 +384,17 @@ class Agent:
 
 
 
-# How do people meet new people?
-# How do connections change?
-
 """
 DNA Spec:
     Sex (1 = Male, 0 = Female)
     Myer-Briggs
 
-
 """
+
+if __name__ == '__main__':
+    x = Society.generate_random(15)
+    print x
+    for _ in xrange(365 * 100):
+        x.next_iteration()
+
+    print x
