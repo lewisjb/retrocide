@@ -484,6 +484,9 @@ if __name__ == '__main__':
             print "Invalid number"
             continue
         if n >= 0 and n < len(x.agents):
+            if x.agents[n].dead:
+                print "Stop being a meanie :<"
+                continue
             x.agents[n].die()
         else:
             print "Invalid number"
