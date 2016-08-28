@@ -10,14 +10,27 @@ random_names = [
     "Blanca", "Emilie", "Trang", "Reta", "Roxanne", "Love", "Kary", "Beatris",
     "Estrella", "Shenika", "Gabrielle", "Fernanda", "Herta", "Paz", "Ashlee",
     "Essie", "Candance", "Ryann", "Kizzy", "Eliz", "Macy", "Mae", "Mathilde",
-    "Jenell", "Fredda", "Teressa", "Clarisa" ],
-    [ "Rico", "Elias", "Doug", "Bret", "Cedric", "Ivory", "Lacy",
-    "Granville", "Dee", "Eli", "Tom", "Ezequiel", "Harry", "Vernon", "Hyman",
-    "Roderick", "Beau", "Dale", "Abraham", "Stevie", "Clair", "Clay", "Marion",
-    "Ted", "Clayton", "Carmelo", "Frederick", "Stephen", "Nathan", "Rosario",
-    "Lowell", "Genaro", "Luigi", "Tad", "Joan", "Ralph", "Blake", "Kevin",
-    "Clark", "Clifford", "Efren", "Hong", "Anthony", "Vince", "Manual",
-    "Moses", "Emanuel", "Joseph", "Brendon", "Jules" ]
+    "Jenell", "Fredda", "Teressa", "Clarisa", "Ainsley", "Marisa", "Rachel",
+    "Astrid", "Hayley", "Felicia" ],
+    ["Matthew", "Evan", "Simon", "Tom", "Logan", "Aidan", "Joseph", "Mitch",
+    "Jack", "Dragan", "Kaamraan", "Cameron", "Dylan", "Joel", "Justin", "Matt",
+    "Daniel", "James", "Max", "Alex", "Jim", "Joseph", "Dave", "Nicolaus",
+    "Mark", "Tom", "Nicholas", "Max", "Lachlan", "Lewis", "Jake", "Chris",
+    "Neil", "Elliot", "Cyrill", "Tylor", "Sameer", "Dave", "Nick", "Randall",
+    "David", "Adam", "Ibraheem", "William", "Xander", "Ross", "Damian",
+    "Harry", "Scott", "Blaid", "Ken", "Christopher", "Anthony"]
+]
+
+def get_random_name(sex):
+    return random_names[sex][random.randrange(len(random_names[sex]))]
+
+random_weapons = [
+    "Candlestick", "Dagger", "Lead Pipe", "Revolver", "Rope", "Spanner"
+]
+
+random_locations = [
+    "Ballroom", "Billiard Room", "Conservatory", "Dining Room", "Hall",
+    "Kitchen", "Library", "Lounge", "Study"
 ]
 
 class Society:
@@ -272,7 +285,7 @@ class Agent:
 
         offspring_dna = "%c%c" % (male, personality_int)
 
-        offspring_name = random_names[male][random.randrange(50)]
+        offspring_name = get_random_name(male)
         offspring = Agent(offspring_dna, offspring_name)
 
         # Make connections with parents
@@ -339,7 +352,7 @@ class Agent:
                             agent.emotions.joy + agent.emotions.trust)
                         pf += (c.emotions.joy + c.emotions.trust +
                             co_c.emotions.joy + co_c.emotions.trust)
-                        if pf > 25:
+                        if pf > 100:
                             # Should probs do more checking of stuff
                             self.pregnant = 1
                             self.partner = agent
@@ -348,17 +361,23 @@ class Agent:
                             agent.partner = self
                             
                             # Regret
-                            #self.emotions.joy /= 2
-                            #self.emotions.trust /= 2
+                            self.emotions.joy = 0
+                            self.emotions.trust = 0
 
-                            #agent.emotions.joy /= 2
-                            #agent.emotions.trust /= 2
+                            agent.emotions.joy = 0
+                            agent.emotions.trust = 0
+
+                            c.emotions.joy = 0
+                            c.emotions.trust = 0
+
+                            co_c.emotions.joy = 0
+                            co_c.emotions.trust = 0
                         
 
 
         # Increase positive emotions
         if pc > 2:
-            if random.random() < 0.1:
+            if random.random() < 0.02:
                 c.emotions.joy += 1
                 c.emotions.trust += 1
                 co_c.emotions.joy += 1
@@ -371,7 +390,7 @@ class Agent:
                 agent.emotions.trust += 1
 
         if pc < 1:
-            if random.random() < 0.01:
+            if random.random() < 0.02:
                 c.emotions.anger += 1
                 c.emotions.disgust += 1
                 co_c.emotions.anger += 1
@@ -390,7 +409,9 @@ class Agent:
         self.emotions.anger = 0
         self.emotions.fear += 30
 
-        print "%s killed %s." % (self.name, agent.name)
+        print "%s killed %s in the %s with a %s!" % (self.name, agent.name,
+                random_locations[random.randrange(len(random_locations))],
+                random_weapons[random.randrange(len(random_weapons))])
         agent.die()
 
     def die(self):
@@ -431,7 +452,7 @@ class Agent:
                 personality_int |= (1 << i)
 
         dna = "%c%c" % (sex, personality_int) # XXX Fix dis
-        name = random_names[sex][random.randrange(50)]
+        name = get_random_name(sex)
         agent = Agent(dna, name)
 
         agent.age = random.randrange(0, 20 * 365)
